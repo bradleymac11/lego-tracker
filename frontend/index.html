@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BrickHunt AU — LEGO Price Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red: #e3000b; --red-dark: #a0000a; --yellow: #ffcd00;
+    --dark: #0f0f0f; --surface: #1a1a1a; --card: #212121;
+    --border: #2e2e2e; --text: #f0f0f0; --muted: #777;
+    --green: #00c853; --orange: #ff6d00;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--dark); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; overflow-x: hidden; }
+  body::before { content:''; position:fixed; inset:0; background-image:radial-gradient(circle,#ffffff06 1px,transparent 1px); background-size:28px 28px; pointer-events:none; z-index:0; }
+  .wrap { max-width: 1400px; margin: 0 auto; padding: 0 20px; position: relative; z-index: 1; }
+
+  /* ─── HEADER ─── */
+  header { background:var(--red); padding:0 20px; position:sticky; top:0; z-index:200; box-shadow:0 4px 0 var(--red-dark),0 8px 28px rgba(0,0,0,.6); }
+  .header-inner { max-width:1400px; margin:0 auto; display:flex; align-items:center; gap:16px; height:62px; }
+  .logo { font-family:'Bebas Neue',sans-serif; font-size:1.9rem; letter-spacing:2px; color:var(--yellow); text-shadow:2px 2px 0 rgba(0,0,0,.35); flex-shrink:0; cursor:pointer; }
+  .logo span { color:#fff; }
+  .search-bar { display:flex; align-items:center; background:rgba(0,0,0,.3); border:2px solid rgba(255,255,255,.18); border-radius:6px; overflow:hidden; flex:1; max-width:340px; }
+  .search-bar input { background:none; border:none; outline:none; color:#fff; font-family:'DM Sans',sans-serif; font-size:.88rem; padding:8px 12px; flex:1; }
+  .search-bar input::placeholder { color:rgba(255,255,255,.45); }
+  .search-bar button { background:var(--yellow); border:none; cursor:pointer; padding:8px 13px; font-size:.95rem; }
+  .last-updated { font-size:.7rem; color:rgba(255,255,255,.65); flex-shrink:0; margin-left:auto; }
+
+  /* ─── TABS ─── */
+  .tabs { display:flex; gap:4px; padding:16px 0 0; border-bottom:2px solid var(--border); margin-bottom:16px; }
+  .tab { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; letter-spacing:1.5px; padding:10px 22px 10px; cursor:pointer; color:var(--muted); border-bottom:3px solid transparent; margin-bottom:-2px; transition:color .15s,border-color .15s; display:flex; align-items:center; gap:8px; }
+  .tab:hover { color:var(--text); }
+  .tab.active { color:var(--yellow); border-bottom-color:var(--yellow); }
+  .tab .tab-badge { font-family:'DM Sans',sans-serif; font-size:.65rem; font-weight:700; background:var(--red); color:#fff; padding:2px 7px; border-radius:10px; }
+
+  /* ─── STATS ─── */
+  .stats-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:16px; }
+  .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:14px 16px; text-align:center; animation:fadeUp .4s ease both; }
+  .stat-value { font-family:'Bebas Neue',sans-serif; font-size:2rem; color:var(--yellow); line-height:1; }
+  .stat-label { font-size:.7rem; color:var(--muted); margin-top:3px; text-transform:uppercase; letter-spacing:1px; }
+
+  /* ─── CONTROLS ─── */
+  .controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:14px; }
+  .btn { font-family:'DM Sans',sans-serif; font-size:.8rem; font-weight:700; padding:7px 14px; border-radius:6px; border:2px solid var(--border); background:var(--surface); color:var(--text); cursor:pointer; transition:all .12s; text-transform:uppercase; letter-spacing:.5px; }
+  .btn:hover { border-color:var(--yellow); color:var(--yellow); }
+  .btn.active { background:var(--yellow); color:var(--dark); border-color:var(--yellow); }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  select { font-family:'DM Sans',sans-serif; font-size:.8rem; padding:7px 11px; border-radius:6px; border:2px solid var(--border); background:var(--surface); color:var(--text); cursor:pointer; outline:none; }
+  select:focus { border-color:var(--yellow); }
+  .ml-auto { margin-left:auto; }
+  .btn-red { background:var(--red); border-color:var(--red); color:#fff; }
+  .btn-red:hover { background:var(--red-dark); border-color:var(--red-dark); color:#fff; }
+
+  /* ─── PAGES ─── */
+  .page { display:none; }
+  .page.active { display:block; }
+
+  /* ─── GRID ─── */
+  .grid-header { display:flex; align-items:baseline; gap:10px; margin-bottom:10px; }
+  .grid-title { font-family:'Bebas Neue',sans-serif; font-size:1.5rem; letter-spacing:1px; }
+  .grid-count { color:var(--muted); font-size:.82rem; }
+  #product-grid, #drops-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; padding-bottom:40px; }
+
+  /* ─── CARDS WITH IMAGE ─── */
+  .card { background:var(--card); border:1px solid var(--border); border-radius:10px; overflow:hidden; animation:fadeUp .32s ease both; transition:transform .14s,box-shadow .14s,border-color .14s; position:relative; cursor:pointer; }
+  .card:hover { transform:translateY(-4px); box-shadow:0 10px 32px rgba(0,0,0,.5); border-color:#444; }
+
+  .card-img-wrap { position:relative; background:#1a1a1a; aspect-ratio:1/0.72; overflow:hidden; }
+  .card-img { width:100%; height:100%; object-fit:contain; padding:10px; transition:transform .2s; }
+  .card:hover .card-img { transform:scale(1.04); }
+  .card-img-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:var(--border); font-size:2.5rem; }
+
+  .card-top { padding:10px 12px 8px; }
+  .card-retailer { display:inline-block; font-size:.63rem; font-weight:700; text-transform:uppercase; letter-spacing:1px; padding:3px 7px; border-radius:4px; margin-bottom:6px; }
+  .card-name { font-size:.84rem; font-weight:500; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; min-height:2.3em; }
+  .card-set { font-size:.68rem; color:var(--muted); margin-top:3px; }
+
+  .card-bottom { display:flex; align-items:flex-end; justify-content:space-between; padding:8px 12px 12px; border-top:1px solid var(--border); margin-top:8px; }
+  .price-current { font-family:'Bebas Neue',sans-serif; font-size:1.7rem; line-height:1; color:var(--yellow); }
+  .price-rrp { font-size:.73rem; color:var(--muted); text-decoration:line-through; margin-top:2px; }
+  .price-prev { font-size:.73rem; color:var(--muted); margin-top:2px; }
+  .badge { font-family:'Bebas Neue',sans-serif; font-size:1.35rem; padding:5px 10px; border-radius:6px; line-height:1; text-align:center; min-width:62px; }
+  .badge-hot { background:var(--red); color:#fff; }
+  .badge-good { background:var(--orange); color:#fff; }
+  .badge-ok { background:#444; color:#ccc; }
+  .badge-drop { background:#1a3a1a; border:1px solid #2d6b2d; color:var(--green); }
+
+  .ribbon { position:absolute; top:10px; right:-6px; background:var(--red); color:#fff; font-size:.6rem; font-weight:700; padding:3px 10px 3px 8px; text-transform:uppercase; letter-spacing:.5px; box-shadow:-2px 2px 4px rgba(0,0,0,.3); z-index:2; }
+  .ribbon::after { content:''; position:absolute; right:0; bottom:-6px; border-left:6px solid var(--red-dark); border-bottom:6px solid transparent; }
+  .ribbon-drop { background:#1a5c1a; }
+  .ribbon-drop::after { border-left-color:#0f3a0f; }
+
+  .drop-arrow { font-size:.73rem; color:var(--green); font-weight:700; margin-top:4px; display:flex; align-items:center; gap:4px; }
+
+  /* ─── STOCK STATUS ─── */
+  /* Out of stock card: desaturate + dim the whole card */
+  .out-of-stock { filter: grayscale(60%); opacity: .6; }
+  .out-of-stock .price-current { color: var(--muted) !important; }
+
+  /* Stock banner overlaid across the image */
+  .stock-banner {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(20,0,0,.82);
+    backdrop-filter: blur(2px);
+    color: #ff5252;
+    font-size: .68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    padding: 5px 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    z-index: 3;
+  }
+  .stock-banner::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #ff5252; flex-shrink: 0; animation: pulse-red 1.4s ease infinite; }
+  .stock-in .stock-banner::before { background: var(--green); animation: pulse-green 2s ease infinite; }
+
+  /* In-stock subtle indicator in corner of image */
+  .stock-dot {
+    position: absolute;
+    bottom: 8px; left: 8px;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    z-index: 3;
+    border: 1.5px solid rgba(0,0,0,.5);
+  }
+  .stock-dot.in   { background: var(--green); box-shadow: 0 0 6px rgba(0,200,83,.5); }
+  .stock-dot.out  { background: #ff5252;  box-shadow: 0 0 6px rgba(255,82,82,.5); }
+  .stock-dot.unkn { background: var(--muted); }
+
+  /* Inline stock pill shown under the product name */
+  .stock-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: .67rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    margin-top: 5px;
+  }
+  .stock-pill::before { content:''; width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+  .stock-pill.in   { background: rgba(0,200,83,.12); color: var(--green);  border: 1px solid rgba(0,200,83,.25); }
+  .stock-pill.in::before  { background: var(--green); }
+  .stock-pill.out  { background: rgba(255,82,82,.12);  color: #ff5252;  border: 1px solid rgba(255,82,82,.25); }
+  .stock-pill.out::before { background: #ff5252; }
+  .stock-pill.unkn { background: rgba(120,120,120,.12); color: var(--muted); border: 1px solid rgba(120,120,120,.2); }
+  .stock-pill.unkn::before { background: var(--muted); }
+
+  /* Stock filter button */
+  .btn-stock-out { border-color: #ff5252 !important; color: #ff5252 !important; }
+  .btn-stock-out.active { background: #ff5252 !important; color: #fff !important; border-color: #ff5252 !important; }
+
+  /* Compare modal stock badges */
+  .compare-stock-in  { display:inline-flex; align-items:center; gap:4px; font-size:.7rem; color:var(--green); font-weight:600; }
+  .compare-stock-out { display:inline-flex; align-items:center; gap:4px; font-size:.7rem; color:#ff5252; font-weight:600; }
+  .compare-stock-in::before  { content:''; width:6px; height:6px; border-radius:50%; background:var(--green); flex-shrink:0; }
+  .compare-stock-out::before { content:''; width:6px; height:6px; border-radius:50%; background:#ff5252;  flex-shrink:0; }
+
+  @keyframes pulse-red {
+    0%,100% { box-shadow: 0 0 0 0 rgba(255,82,82,.6); }
+    50%      { box-shadow: 0 0 0 4px rgba(255,82,82,0); }
+  }
+  @keyframes pulse-green {
+    0%,100% { box-shadow: 0 0 0 0 rgba(0,200,83,.4); }
+    50%      { box-shadow: 0 0 0 4px rgba(0,200,83,0); }
+  }
+
+  /* ─── RETAILER COLOURS ─── */
+  .r-bigw{background:#0057a8;color:#fff} .r-target{background:#cc0000;color:#fff} .r-kmart{background:#d60812;color:#fff}
+  .r-amazon{background:#ff9900;color:#111} .r-catch{background:#e84393;color:#fff} .r-jbhifi{background:#ffd100;color:#111}
+  .r-myer{background:#1a1a3e;color:#fff} .r-ebgames{background:#003087;color:#fff}
+
+  /* ─── COMPARE PAGE / MODAL ─── */
+  #compare-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.85);
+    z-index: 500; display: none; overflow-y: auto;
+    padding: 20px;
+    backdrop-filter: blur(4px);
+  }
+  #compare-overlay.open { display: flex; justify-content: center; align-items: flex-start; }
+
+  .compare-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    max-width: 900px;
+    width: 100%;
+    margin: 20px auto;
+    overflow: hidden;
+    animation: slideUp .25s ease;
+  }
+
+  .compare-header {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 24px;
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+  }
+  .compare-set-img {
+    width: 140px;
+    height: 100px;
+    object-fit: contain;
+    background: #1a1a1a;
+    border-radius: 8px;
+    padding: 8px;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+  }
+  .compare-set-img-placeholder {
+    width: 140px; height: 100px;
+    background: var(--dark);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2.5rem;
+    flex-shrink: 0;
+  }
+  .compare-meta { flex: 1; min-width: 0; }
+  .compare-title { font-family:'Bebas Neue',sans-serif; font-size:1.6rem; letter-spacing:1px; line-height:1.15; margin-bottom:6px; }
+  .compare-sub { font-size:.8rem; color:var(--muted); display:flex; gap:16px; flex-wrap:wrap; }
+  .compare-sub span { display:flex; align-items:center; gap:5px; }
+  .compare-close {
+    background: #333; border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; width: 34px; height: 34px;
+    cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-left: auto;
+    transition: background .12s;
+  }
+  .compare-close:hover { background: var(--red); border-color: var(--red); }
+
+  .compare-body { padding: 20px 24px 28px; }
+  .compare-section-title { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; letter-spacing:1.5px; color:var(--muted); margin-bottom:12px; }
+
+  /* Best price highlight */
+  .best-price-bar {
+    background: linear-gradient(135deg, #1a2a1a, #152215);
+    border: 1px solid #2d5c2d;
+    border-radius: 10px;
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .best-price-label { font-size:.75rem; text-transform:uppercase; letter-spacing:1px; color:var(--green); font-weight:700; }
+  .best-price-value { font-family:'Bebas Neue',sans-serif; font-size:2.4rem; color:var(--green); line-height:1; }
+  .best-price-at { font-size:.82rem; color:var(--muted); margin-top:2px; }
+  .best-price-save { margin-left:auto; font-family:'Bebas Neue',sans-serif; font-size:1.5rem; color:var(--yellow); text-align:right; }
+  .best-price-save small { display:block; font-family:'DM Sans',sans-serif; font-size:.68rem; color:var(--muted); font-weight:400; letter-spacing:.5px; text-transform:uppercase; }
+
+  /* Retailer comparison rows */
+  .compare-rows { display: flex; flex-direction: column; gap: 8px; }
+  .compare-row {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    transition: border-color .12s;
+  }
+  .compare-row:hover { border-color: #555; }
+  .compare-row.best { border-color: #2d5c2d; background: #131f13; }
+  .compare-row-retailer { flex-shrink: 0; }
+  .compare-row-name { flex: 1; min-width: 0; font-size:.84rem; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .compare-row-price { font-family:'Bebas Neue',sans-serif; font-size:1.5rem; color:var(--yellow); flex-shrink:0; }
+  .compare-row.best .compare-row-price { color:var(--green); }
+  .compare-row-badge { flex-shrink:0; }
+  .compare-row-link {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: var(--red); color: #fff;
+    text-decoration: none; padding: 7px 14px;
+    border-radius: 6px; font-size:.78rem; font-weight:700;
+    text-transform: uppercase; letter-spacing:.5px;
+    flex-shrink: 0;
+    transition: background .12s;
+  }
+  .compare-row-link:hover { background: var(--red-dark); }
+  .compare-row-link.best-link { background: var(--green); color: #000; }
+  .compare-row-link.best-link:hover { background: #00a843; }
+  .compare-row-savings { font-size:.72rem; color:var(--muted); flex-shrink:0; width:70px; text-align:right; }
+  .compare-row-savings.highlight { color:var(--green); font-weight:700; }
+  .price-bar-wrap { flex: 1; }
+  .price-bar-bg { background: var(--border); border-radius: 4px; height: 5px; overflow:hidden; }
+  .price-bar-fill { height:100%; border-radius:4px; background: var(--yellow); transition:width .5s ease; }
+  .compare-row.best .price-bar-fill { background: var(--green); }
+
+  /* History mini-chart */
+  .history-section { margin-top: 24px; }
+  .history-empty { font-size:.82rem; color:var(--muted); font-style:italic; }
+  .history-chart-wrap { position:relative; height:80px; margin-top:8px; }
+  canvas#historyChart { width:100% !important; }
+
+  /* ─── ALERTS TAB ─── */
+  .alerts-panel { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:22px 24px; margin-bottom:16px; animation:fadeUp .4s ease both; }
+  .alerts-panel h2 { font-family:'Bebas Neue',sans-serif; font-size:1.4rem; letter-spacing:1.5px; margin-bottom:4px; }
+  .alerts-panel p { font-size:.83rem; color:var(--muted); margin-bottom:18px; line-height:1.5; }
+  .alert-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media(max-width:640px){.alert-grid{grid-template-columns:1fr}}
+  .alert-box { background:var(--dark); border:1px solid var(--border); border-radius:8px; padding:16px; }
+  .alert-box h3 { font-size:.85rem; font-weight:700; margin-bottom:10px; display:flex; align-items:center; gap:6px; }
+  .alert-box .steps { font-size:.8rem; color:var(--muted); line-height:1.8; }
+  .alert-box .steps b { color:var(--text); }
+  .alert-box code { background:#2a2a2a; padding:2px 6px; border-radius:4px; font-family:monospace; font-size:.78rem; color:var(--yellow); }
+  .alert-status { display:flex; align-items:center; gap:6px; font-size:.78rem; margin-top:10px; padding-top:10px; border-top:1px solid var(--border); }
+  .dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+  .dot-green{background:var(--green)} .dot-grey{background:var(--muted)} .dot-yellow{background:var(--yellow)}
+  .watched-input { display:flex; gap:8px; margin-top:10px; }
+  .watched-input input { flex:1; background:#2a2a2a; border:1px solid var(--border); border-radius:5px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:.82rem; padding:6px 10px; outline:none; }
+  .watched-input input:focus { border-color:var(--yellow); }
+  .watched-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .tag { background:#2a2a2a; border:1px solid var(--border); border-radius:4px; padding:3px 8px; font-size:.75rem; display:flex; align-items:center; gap:5px; color:var(--text); }
+  .tag-remove { cursor:pointer; color:var(--muted); font-size:.9rem; line-height:1; }
+  .tag-remove:hover { color:var(--red); }
+
+  /* ─── LOADING / EMPTY ─── */
+  .loading { text-align:center; padding:70px 20px; color:var(--muted); }
+  .spinner { width:36px; height:36px; border:3px solid var(--border); border-top-color:var(--yellow); border-radius:50%; animation:spin .7s linear infinite; margin:0 auto 14px; }
+  .loading-text { font-family:'Bebas Neue',sans-serif; font-size:1.3rem; letter-spacing:2px; }
+  .drops-empty { grid-column:1/-1; text-align:center; padding:60px 20px; color:var(--muted); }
+  .drops-empty-icon { font-size:3rem; margin-bottom:12px; }
+  .drops-empty-title { font-family:'Bebas Neue',sans-serif; font-size:1.6rem; letter-spacing:1px; margin-bottom:8px; }
+  .drops-empty-text { font-size:.85rem; max-width:380px; margin:0 auto; line-height:1.6; }
+  .api-notice { background:#1c1800; border:1px solid #443800; border-radius:8px; padding:12px 16px; margin-bottom:14px; font-size:.8rem; color:#ccaa00; }
+  .api-notice b { color:var(--yellow); }
+
+  /* ─── FOOTER ─── */
+  footer { border-top:1px solid var(--border); padding:20px; text-align:center; font-size:.72rem; color:var(--muted); position:relative; z-index:1; }
+
+  /* ─── ANIMATIONS ─── */
+  @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes slideUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes spin { to{transform:rotate(360deg)} }
+
+  @media(max-width:600px){
+    .logo{font-size:1.45rem} .last-updated{display:none} .search-bar{max-width:none}
+    .compare-header{flex-wrap:wrap}
+    .compare-set-img, .compare-set-img-placeholder{width:100%;height:140px}
+    .compare-row{flex-wrap:wrap; gap:8px}
+    .compare-row-name{width:100%; white-space:normal}
+    .price-bar-wrap{display:none}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo" onclick="goHome()">Brick<span>Hunt</span> AU</div>
+    <div class="search-bar">
+      <input type="text" id="search" placeholder="Search sets, themes…" oninput="onSearch()">
+      <button>🔍</button>
+    </div>
+    <div class="last-updated" id="last-updated">Loading…</div>
+  </div>
+</header>
+
+<!-- ══ COMPARE OVERLAY ═══════════════════════════════════════════════════════ -->
+<div id="compare-overlay" onclick="closeCompareOnBg(event)">
+  <div class="compare-panel" id="compare-panel">
+    <div class="compare-header" id="compare-header">
+      <div class="loading"><div class="spinner"></div></div>
+    </div>
+    <div class="compare-body" id="compare-body"></div>
+  </div>
+</div>
+
+<!-- ══ MAIN ═══════════════════════════════════════════════════════════════════ -->
+<div class="wrap">
+
+  <div class="tabs">
+    <div class="tab active" id="tab-deals" onclick="switchTab('deals')">🏷️ Best Deals <span class="tab-badge" id="badge-deals">—</span></div>
+    <div class="tab" id="tab-drops" onclick="switchTab('drops')">📉 Daily Drops <span class="tab-badge" id="badge-drops">—</span></div>
+    <div class="tab" id="tab-alerts" onclick="switchTab('alerts')">🔔 Alerts</div>
+  </div>
+
+  <!-- DEALS PAGE -->
+  <div class="page active" id="page-deals">
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-value" id="stat-total">—</div><div class="stat-label">Total Sets</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-sale">—</div><div class="stat-label">On Sale</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-best">—</div><div class="stat-label">Best Discount</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-retailers">—</div><div class="stat-label">Retailers</div></div>
+      <div class="stat-card" style="border-color:#2a1a1a" onclick="setFilter('oos')" title="Click to filter out-of-stock items" style="cursor:pointer">
+        <div class="stat-value" id="stat-oos" style="color:#ff5252">—</div>
+        <div class="stat-label">Out of Stock</div>
+      </div>
+    </div>
+    <div id="api-notice" class="api-notice" style="display:none">⚙️ <b>Demo mode</b> — update <code>API_URL</code> in this file to your Render backend URL to see live data.</div>
+    <div class="controls">
+      <button class="btn active" id="f-all"  onclick="setFilter('all')">All</button>
+      <button class="btn" id="f-sale" onclick="setFilter('sale')">🔥 On Sale</button>
+      <button class="btn" id="f-10"   onclick="setFilter('10')">10%+ Off</button>
+      <button class="btn" id="f-20"   onclick="setFilter('20')">20%+ Off</button>
+      <button class="btn" id="f-50"   onclick="setFilter('50')">50%+ Off</button>
+      <button class="btn btn-stock-out" id="f-oos" onclick="setFilter('oos')">⚠️ Out of Stock</button>
+      <select id="retailer-filter" onchange="renderDeals()"><option value="">All Retailers</option></select>
+      <select id="sort-deals" onchange="renderDeals()" class="ml-auto">
+        <option value="discount">Biggest Discount</option>
+        <option value="price-asc">Price: Low → High</option>
+        <option value="price-desc">Price: High → Low</option>
+        <option value="name">Name A–Z</option>
+      </select>
+      <button class="btn btn-red" id="refresh-btn" onclick="triggerRefresh()">↻ Refresh</button>
+    </div>
+    <div class="grid-header"><div class="grid-title">LEGO Deals</div><div class="grid-count" id="deals-count"></div></div>
+    <div id="product-grid"><div class="loading"><div class="spinner"></div><div class="loading-text">Hunting bricks…</div></div></div>
+  </div>
+
+  <!-- DROPS PAGE -->
+  <div class="page" id="page-drops">
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-value" id="drop-count">—</div><div class="stat-label">Drops Today</div></div>
+      <div class="stat-card"><div class="stat-value" id="drop-best-pct">—</div><div class="stat-label">Biggest Drop %</div></div>
+      <div class="stat-card"><div class="stat-value" id="drop-best-amt">—</div><div class="stat-label">Biggest Drop $</div></div>
+      <div class="stat-card"><div class="stat-value" id="drop-date">—</div><div class="stat-label">Date</div></div>
+    </div>
+    <div class="controls">
+      <select id="drops-retailer" onchange="renderDrops()"><option value="">All Retailers</option></select>
+      <select id="sort-drops" onchange="renderDrops()" class="ml-auto">
+        <option value="pct">Biggest % Drop</option>
+        <option value="amt">Biggest $ Drop</option>
+      </select>
+    </div>
+    <div class="grid-header"><div class="grid-title">Today's Price Drops</div><div class="grid-count" id="drops-count"></div></div>
+    <div id="drops-grid"><div class="loading"><div class="spinner"></div><div class="loading-text">Loading drops…</div></div></div>
+  </div>
+
+  <!-- ALERTS PAGE -->
+  <div class="page" id="page-alerts">
+    <div class="alerts-panel">
+      <h2>🔔 Deal Alerts</h2>
+      <p>Get notified when LEGO sets hit 50%+ off, or when your specific watched sets go on sale. All configured via Render environment variables.</p>
+      <div class="alert-grid">
+        <div class="alert-box">
+          <h3>📱 Push Notifications (Free)</h3>
+          <div class="steps">
+            <b>1.</b> Download the free <b>ntfy</b> app (iOS/Android) or visit <b>ntfy.sh</b><br>
+            <b>2.</b> In Render → Environment, add:<br><br>
+            <code>NTFY_TOPIC</code> = <code>lego-deals-yourname123</code><br><br>
+            <b>3.</b> Subscribe to that topic in the ntfy app<br>
+            <b>4.</b> Done! Instant phone alerts on deals
+          </div>
+          <div class="alert-status" id="ntfy-status"><div class="dot dot-grey"></div><span>Not configured</span></div>
+        </div>
+        <div class="alert-box">
+          <h3>📧 Email Alerts (Gmail)</h3>
+          <div class="steps">
+            <b>1.</b> Enable 2FA on your Google account<br>
+            <b>2.</b> Go to <b>myaccount.google.com → Security → App Passwords</b><br>
+            <b>3.</b> Generate an App Password for "Mail"<br>
+            <b>4.</b> Add to Render Environment:<br><br>
+            <code>ALERT_EMAIL_FROM</code> = your Gmail<br>
+            <code>ALERT_EMAIL_PASS</code> = 16-char app password<br>
+            <code>ALERT_EMAIL_TO</code> = destination email
+          </div>
+          <div class="alert-status" id="email-status"><div class="dot dot-grey"></div><span>Not configured</span></div>
+        </div>
+        <div class="alert-box">
+          <h3>🎯 Watched Sets</h3>
+          <div class="steps">Add set numbers — you'll get alerted the moment they go on sale anywhere.<br><br>Copy the final list to Render as <code>WATCHED_SETS</code> = <code>75375,42151</code></div>
+          <div class="watched-input">
+            <input type="text" id="watched-input" placeholder="Set number e.g. 75375" onkeydown="if(event.key==='Enter')addWatched()">
+            <button class="btn" onclick="addWatched()">+ Add</button>
+          </div>
+          <div class="watched-tags" id="watched-tags"></div>
+        </div>
+        <div class="alert-box">
+          <h3>⚙️ Settings</h3>
+          <div class="steps">
+            Set alert threshold in Render Environment:<br><br>
+            <code>ALERT_MIN_DISCOUNT</code> = <code>50</code><br><br>
+            (Change to 30 for 30%+ off alerts, etc.)<br><br>
+            Once deployed, test your setup:
+          </div>
+          <div style="margin-top:12px">
+            <button class="btn" onclick="testAlerts()">Send Test Alert</button>
+            <span id="test-result" style="font-size:.78rem;color:var(--muted);margin-left:10px"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<footer>BrickHunt AU — Not affiliated with The LEGO Group. Prices updated hourly. Always verify price at retailer before purchasing.</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+// ─── CONFIG ────────────────────────────────────────────────────────────────────
+const API_URL = 'YOUR_RENDER_API_URL_HERE';
+// Replace with your Render URL, e.g.: 'https://lego-au-tracker.onrender.com'
+
+// ─── STATE ─────────────────────────────────────────────────────────────────────
+let allProducts = [];
+let allDrops = [];
+let currentFilter = 'all';
+let watchedSets = JSON.parse(localStorage.getItem('watchedSets') || '[]');
+let currentTab = 'deals';
+let historyChartInstance = null;
+
+// ─── INIT ──────────────────────────────────────────────────────────────────────
+async function init() {
+  renderWatchedTags();
+  if (API_URL === 'YOUR_RENDER_API_URL_HERE') {
+    document.getElementById('api-notice').style.display = 'block';
+    allProducts = demoProducts();
+    allDrops = demoDrops();
+    updateAll();
+    return;
+  }
+  await Promise.all([loadPrices(), loadDrops(), loadAlertConfig()]);
+}
+
+async function loadPrices() {
+  try {
+    const r = await fetch(`${API_URL}/api/prices`);
+    const data = await r.json();
+    allProducts = data.products || [];
+    const lu = data.last_updated ? new Date(data.last_updated).toLocaleString('en-AU') : '—';
+    document.getElementById('last-updated').textContent = `Updated ${lu}`;
+    populateRetailerDropdown('retailer-filter', allProducts);
+    updateDealsStats();
+    renderDeals();
+  } catch(e) {
+    document.getElementById('product-grid').innerHTML = `<div class="loading" style="color:#e66">❌ Backend unreachable. Check your API_URL.<br><small>${e.message}</small></div>`;
+  }
+}
+
+async function loadDrops() {
+  try {
+    const r = await fetch(`${API_URL}/api/drops`);
+    const data = await r.json();
+    allDrops = data.drops || [];
+    const today = data.date || '';
+    document.getElementById('drop-date').textContent = today.slice(5);
+    populateRetailerDropdown('drops-retailer', allDrops);
+    updateDropsStats();
+    renderDrops();
+    document.getElementById('badge-drops').textContent = allDrops.length || '0';
+  } catch(e) {}
+}
+
+async function loadAlertConfig() {
+  try {
+    const r = await fetch(`${API_URL}/api/alerts/config`);
+    const cfg = await r.json();
+    document.getElementById('ntfy-status').innerHTML = cfg.push_configured
+      ? `<div class="dot dot-green"></div><span>Active — topic: <b>${cfg.ntfy_topic}</b></span>`
+      : `<div class="dot dot-grey"></div><span>Not configured</span>`;
+    document.getElementById('email-status').innerHTML = cfg.email_configured
+      ? `<div class="dot dot-green"></div><span>Active — alerts at ${cfg.min_discount_alert}%+ off</span>`
+      : `<div class="dot dot-grey"></div><span>Not configured</span>`;
+  } catch(e) {}
+}
+
+function updateAll() {
+  populateRetailerDropdown('retailer-filter', allProducts);
+  populateRetailerDropdown('drops-retailer', allDrops);
+  updateDealsStats(); updateDropsStats();
+  renderDeals(); renderDrops();
+  document.getElementById('badge-drops').textContent = allDrops.length || '0';
+}
+
+// ─── TABS ──────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  currentTab = tab;
+  ['deals','drops','alerts'].forEach(t => {
+    document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+    document.getElementById(`page-${t}`).classList.toggle('active', t === tab);
+  });
+}
+
+function goHome() {
+  closeCompare();
+  switchTab('deals');
+}
+
+// ─── STATS ─────────────────────────────────────────────────────────────────────
+function updateDealsStats() {
+  const onSale  = allProducts.filter(p => p.discount_pct > 0);
+  const outOfStock = allProducts.filter(p => p.in_stock === false);
+  const best    = onSale.length ? Math.max(...onSale.map(p => p.discount_pct)) : 0;
+  document.getElementById('stat-total').textContent     = allProducts.length;
+  document.getElementById('stat-sale').textContent      = onSale.length;
+  document.getElementById('stat-best').textContent      = best ? `${best}%` : '—';
+  document.getElementById('stat-retailers').textContent = new Set(allProducts.map(p => p.retailer)).size;
+  document.getElementById('stat-oos').textContent       = outOfStock.length;
+  document.getElementById('badge-deals').textContent    = onSale.length || '0';
+}
+
+function updateDropsStats() {
+  if (!allDrops.length) {
+    ['drop-count','drop-best-pct','drop-best-amt'].forEach(id => document.getElementById(id).textContent = '—');
+    return;
+  }
+  document.getElementById('drop-count').textContent    = allDrops.length;
+  document.getElementById('drop-best-pct').textContent = `${Math.max(...allDrops.map(d => d.drop_pct))}%`;
+  document.getElementById('drop-best-amt').textContent = `$${Math.max(...allDrops.map(d => d.drop_amount)).toFixed(0)}`;
+}
+
+// ─── FILTERS ──────────────────────────────────────────────────────────────────
+function setFilter(f) {
+  currentFilter = f;
+  ['all','sale','10','20','50','oos'].forEach(id => document.getElementById(`f-${id}`)?.classList.toggle('active', id === f));
+  renderDeals();
+}
+
+function onSearch() {
+  if (currentTab === 'deals') renderDeals();
+  else if (currentTab === 'drops') renderDrops();
+}
+
+function getSearch() { return document.getElementById('search').value.toLowerCase(); }
+
+// ─── RENDER DEALS ─────────────────────────────────────────────────────────────
+function renderDeals() {
+  const search = getSearch();
+  const retailer = document.getElementById('retailer-filter').value;
+  const sort = document.getElementById('sort-deals').value;
+  let products = allProducts.filter(p => {
+    if (search && !p.name.toLowerCase().includes(search)) return false;
+    if (retailer && p.retailer !== retailer) return false;
+    if (currentFilter === 'sale' && p.discount_pct <= 0) return false;
+    if (currentFilter === '10'  && p.discount_pct < 10)  return false;
+    if (currentFilter === '20'  && p.discount_pct < 20)  return false;
+    if (currentFilter === '50'  && p.discount_pct < 50)  return false;
+    if (currentFilter === 'oos' && p.in_stock !== false)  return false;
+    return true;
+  });
+  if (sort === 'discount')  products.sort((a,b) => b.discount_pct - a.discount_pct);
+  if (sort === 'price-asc') products.sort((a,b) => a.price - b.price);
+  if (sort === 'price-desc')products.sort((a,b) => b.price - a.price);
+  if (sort === 'name')      products.sort((a,b) => a.name.localeCompare(b.name));
+  document.getElementById('deals-count').textContent = `${products.length} results`;
+  document.getElementById('product-grid').innerHTML = products.length
+    ? products.map((p,i) => dealCard(p,i)).join('')
+    : '<div class="loading"><div class="loading-text">No results found</div></div>';
+}
+
+// ─── RENDER DROPS ─────────────────────────────────────────────────────────────
+function renderDrops() {
+  const search = getSearch();
+  const retailer = document.getElementById('drops-retailer').value;
+  const sort = document.getElementById('sort-drops').value;
+  let drops = allDrops.filter(d => {
+    if (search && !d.name.toLowerCase().includes(search)) return false;
+    if (retailer && d.retailer !== retailer) return false;
+    return true;
+  });
+  if (sort === 'pct') drops.sort((a,b) => b.drop_pct - a.drop_pct);
+  if (sort === 'amt') drops.sort((a,b) => b.drop_amount - a.drop_amount);
+  document.getElementById('drops-count').textContent = `${drops.length} drops today`;
+  if (!drops.length) {
+    document.getElementById('drops-grid').innerHTML = `<div class="drops-empty"><div class="drops-empty-icon">📉</div><div class="drops-empty-title">No Drops Yet Today</div><div class="drops-empty-text">Daily drops appear once the tracker has data from two consecutive days. Check back tomorrow!</div></div>`;
+    return;
+  }
+  document.getElementById('drops-grid').innerHTML = drops.map((d,i) => dropCard(d,i)).join('');
+}
+
+// ─── IMAGE HELPERS ─────────────────────────────────────────────────────────────
+function setImageUrl(setNumber) {
+  if (!setNumber) return null;
+  const clean = setNumber.replace(/-1$/, '');
+  return `https://cdn.rebrickable.com/media/sets/${clean}-1.jpg`;
+}
+
+function imgTag(setNumber, cls='card-img') {
+  const url = setImageUrl(setNumber);
+  if (!url) return `<div class="card-img-placeholder">🧱</div>`;
+  return `<img class="${cls}" src="${url}" alt="LEGO set image" loading="lazy" onerror="this.outerHTML='<div class=\\'card-img-placeholder\\'>🧱</div>'">`;
+}
+
+// ─── CARD BUILDERS ─────────────────────────────────────────────────────────────
+const retailerClass = {'Big W':'r-bigw','Target':'r-target','Kmart':'r-kmart','Amazon AU':'r-amazon','Catch':'r-catch','JB Hi-Fi':'r-jbhifi','Myer':'r-myer','EB Games':'r-ebgames'};
+
+function badgeClass(pct) {
+  if (pct >= 40) return 'badge-hot';
+  if (pct >= 20) return 'badge-good';
+  return 'badge-ok';
+}
+
+// Encode product for onclick
+function enc(p) { return encodeURIComponent(JSON.stringify({n:p.name,s:p.set_number,r:p.retailer})); }
+
+function dealCard(p, i) {
+  const delay = (i%20)*0.025;
+  const rCls = retailerClass[p.retailer]||'';
+  const ribbon = p.discount_pct >= 10 ? `<div class="ribbon">SALE</div>` : '';
+  const badge = p.discount_pct > 0
+    ? `<div class="badge ${badgeClass(p.discount_pct)}">${p.discount_pct}%<br><small style="font-size:.52em;font-family:'DM Sans';font-weight:700">OFF</small></div>`
+    : '';
+  const rrp = p.rrp ? `<div class="price-rrp">RRP $${p.rrp.toFixed(2)}</div>` : '';
+  const set = p.set_number ? `<div class="card-set"># ${p.set_number}</div>` : '';
+
+  // Stock status
+  const inStock   = p.in_stock !== false;  // treat undefined as in-stock
+  const stockKnown = p.in_stock !== undefined && p.in_stock !== null;
+  const stockDotCls = !stockKnown ? 'unkn' : inStock ? 'in' : 'out';
+  const stockPillCls = stockDotCls;
+  const stockPillText = !stockKnown ? 'Stock unknown' : inStock ? 'In Stock' : 'Out of Stock';
+  const stockBanner = !inStock ? `<div class="stock-banner">Out of Stock</div>` : '';
+
+  return `
+    <div class="card${!inStock ? ' out-of-stock' : ''}" style="animation-delay:${delay}s" onclick="openCompare('${enc(p)}')">
+      ${ribbon}
+      <div class="card-img-wrap" style="position:relative">
+        ${imgTag(p.set_number)}
+        <div class="stock-dot ${stockDotCls}" title="${stockPillText}"></div>
+        ${stockBanner}
+      </div>
+      <div class="card-top">
+        <div class="card-retailer ${rCls}">${p.retailer}</div>
+        <div class="card-name">${p.name}</div>
+        ${set}
+        <div class="stock-pill ${stockPillCls}">${stockPillText}</div>
+      </div>
+      <div class="card-bottom">
+        <div><div class="price-current">$${p.price.toFixed(2)}</div>${rrp}</div>
+        ${badge}
+      </div>
+    </div>`;
+}
+
+function dropCard(d, i) {
+  const delay = (i%20)*0.025;
+  const rCls = retailerClass[d.retailer]||'';
+  const set = d.set_number ? `<div class="card-set"># ${d.set_number}</div>` : '';
+
+  const inStock    = d.in_stock !== false;
+  const stockKnown = d.in_stock !== undefined && d.in_stock !== null;
+  const stockDotCls  = !stockKnown ? 'unkn' : inStock ? 'in' : 'out';
+  const stockPillCls = stockDotCls;
+  const stockPillText = !stockKnown ? 'Stock unknown' : inStock ? 'In Stock' : 'Out of Stock';
+  const stockBanner   = !inStock ? `<div class="stock-banner">Out of Stock</div>` : '';
+
+  return `
+    <div class="card${!inStock ? ' out-of-stock' : ''}" style="animation-delay:${delay}s" onclick="openCompare('${enc(d)}')">
+      <div class="ribbon ribbon-drop">↓ DROPPED</div>
+      <div class="card-img-wrap" style="position:relative">
+        ${imgTag(d.set_number)}
+        <div class="stock-dot ${stockDotCls}" title="${stockPillText}"></div>
+        ${stockBanner}
+      </div>
+      <div class="card-top">
+        <div class="card-retailer ${rCls}">${d.retailer}</div>
+        <div class="card-name">${d.name}</div>
+        ${set}
+        <div class="stock-pill ${stockPillCls}">${stockPillText}</div>
+      </div>
+      <div class="card-bottom">
+        <div>
+          <div class="price-current">$${d.price.toFixed(2)}</div>
+          <div class="price-prev">Was $${d.prev_price.toFixed(2)} yesterday</div>
+          <div class="drop-arrow">▼ $${d.drop_amount.toFixed(2)} cheaper today</div>
+        </div>
+        <div class="badge badge-drop">↓${d.drop_pct}%<br><small style="font-size:.52em;font-family:'DM Sans';font-weight:700">TODAY</small></div>
+      </div>
+    </div>`;
+}
+
+// ─── COMPARE PAGE ─────────────────────────────────────────────────────────────
+async function openCompare(encoded) {
+  const meta = JSON.parse(decodeURIComponent(encoded));
+  const overlay = document.getElementById('compare-overlay');
+  document.getElementById('compare-header').innerHTML = `<div class="loading"><div class="spinner"></div></div>`;
+  document.getElementById('compare-body').innerHTML = '';
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  let retailers = [];
+  let imageUrl = null;
+  let lowestPrice = null;
+  let setName = meta.n;
+
+  if (API_URL !== 'YOUR_RENDER_API_URL_HERE' && meta.s) {
+    try {
+      const r = await fetch(`${API_URL}/api/compare/${encodeURIComponent(meta.s)}`);
+      const data = await r.json();
+      retailers = data.retailers || [];
+      imageUrl = data.image_url;
+      lowestPrice = data.lowest_price;
+      if (retailers.length) setName = retailers[0].name;
+    } catch(e) {}
+  }
+
+  // Demo fallback — build fake compare data
+  if (!retailers.length) {
+    retailers = buildDemoCompare(meta);
+    if (!imageUrl && meta.s) imageUrl = setImageUrl(meta.s);
+    lowestPrice = retailers.length ? Math.min(...retailers.map(r => r.price)) : meta.price;
+  }
+
+  // Sort by price asc
+  retailers.sort((a,b) => a.price - b.price);
+  const maxPrice = Math.max(...retailers.map(r => r.price));
+
+  // ─ Header
+  const imgHtml = imageUrl
+    ? `<img class="compare-set-img" src="${imageUrl}" alt="LEGO set" onerror="this.outerHTML='<div class=\\'compare-set-img-placeholder\\'>🧱</div>'">`
+    : `<div class="compare-set-img-placeholder">🧱</div>`;
+
+  const setNumber = meta.s ? `<span>📦 Set #${meta.s}</span>` : '';
+  const retailerCount = `<span>🏪 ${retailers.length} retailer${retailers.length!==1?'s':''}</span>`;
+  const bestDeal = retailers[0];
+  const rrpRef = retailers.find(r => r.rrp)?.rrp;
+  const saving = rrpRef && lowestPrice ? `<span>💰 Up to ${Math.round((rrpRef-lowestPrice)/rrpRef*100)}% off RRP</span>` : '';
+
+  document.getElementById('compare-header').innerHTML = `
+    ${imgHtml}
+    <div class="compare-meta">
+      <div class="compare-title">${setName}</div>
+      <div class="compare-sub">${setNumber}${retailerCount}${saving}</div>
+    </div>
+    <button class="compare-close" onclick="closeCompare()">✕</button>`;
+
+  // ─ Body
+  const rrp = rrpRef;
+  const savingAmt = rrp ? (rrp - lowestPrice).toFixed(2) : null;
+  const savingPct = rrp ? Math.round((rrp-lowestPrice)/rrp*100) : null;
+
+  const bestPriceBar = `
+    <div class="best-price-bar">
+      <div>
+        <div class="best-price-label">Best Price</div>
+        <div class="best-price-value">$${lowestPrice.toFixed(2)}</div>
+        <div class="best-price-at">@ ${bestDeal.retailer}</div>
+      </div>
+      ${savingAmt ? `<div class="best-price-save">$${savingAmt} SAVED<small>vs RRP $${rrp.toFixed(2)}</small></div>` : ''}
+    </div>`;
+
+  const rows = retailers.map((r, idx) => {
+    const isBest = idx === 0;
+    const rCls = retailerClass[r.retailer]||'';
+    const barWidth = maxPrice > 0 ? Math.round((r.price/maxPrice)*100) : 100;
+    const discHtml = r.discount_pct > 0
+      ? `<div class="badge ${badgeClass(r.discount_pct)}" style="font-size:1rem;padding:4px 8px">${r.discount_pct}%</div>`
+      : `<div style="width:58px"></div>`;
+    const savRow = rrp && r.price < rrp ? `<div class="compare-row-savings highlight">Save $${(rrp-r.price).toFixed(2)}</div>` : `<div class="compare-row-savings"></div>`;
+    const stockNote = r.in_stock===false
+      ? `<span class="compare-stock-out">Out of Stock</span>`
+      : `<span class="compare-stock-in">In Stock</span>`;
+    const rowOos = r.in_stock === false ? ' oos-row' : '';
+    return `
+      <div class="compare-row${isBest?' best':''}${rowOos}" style="${r.in_stock===false?'opacity:.55;filter:grayscale(40%)':''}">
+        <div class="compare-row-retailer"><span class="card-retailer ${rCls}" style="font-size:.62rem">${r.retailer}</span></div>
+        <div class="compare-row-name">
+          <div>${r.name.length > 50 ? r.name.slice(0,48)+'…' : r.name}</div>
+          <div style="margin-top:4px">${stockNote}</div>
+        </div>
+        <div class="price-bar-wrap"><div class="price-bar-bg"><div class="price-bar-fill" style="width:${barWidth}%"></div></div></div>
+        <div class="compare-row-price">$${r.price.toFixed(2)}</div>
+        <div class="compare-row-badge">${discHtml}</div>
+        ${savRow}
+        <a href="${r.url||'#'}" target="_blank" rel="noopener" class="compare-row-link${isBest?' best-link':''}${r.in_stock===false?' disabled-link':''}" onclick="event.stopPropagation()" ${r.in_stock===false?'style="opacity:.5;pointer-events:none"':''}>
+          ${isBest && r.in_stock!==false ? '⭐ Buy' : r.in_stock===false ? 'View' : 'View'} →
+        </a>
+      </div>`;
+  }).join('');
+
+  // Price history chart
+  const historyData = buildHistoryData(retailers);
+  const histSection = historyData.labels.length > 1 ? `
+    <div class="history-section">
+      <div class="compare-section-title">PRICE HISTORY (30 DAYS)</div>
+      <div class="history-chart-wrap">
+        <canvas id="historyChart"></canvas>
+      </div>
+    </div>` : `
+    <div class="history-section">
+      <div class="compare-section-title">PRICE HISTORY</div>
+      <div class="history-empty">Not enough data yet — price history builds up over time as the tracker runs.</div>
+    </div>`;
+
+  document.getElementById('compare-body').innerHTML = `
+    ${bestPriceBar}
+    <div class="compare-section-title">ALL RETAILERS (${retailers.length})</div>
+    <div class="compare-rows">${rows}</div>
+    ${histSection}`;
+
+  // Draw chart if we have data
+  if (historyData.labels.length > 1) {
+    setTimeout(() => drawHistoryChart(historyData), 50);
+  }
+}
+
+function buildHistoryData(retailers) {
+  // Merge price history from all retailers into one chart dataset per retailer
+  const datasets = [];
+  const allDates = new Set();
+  retailers.forEach(r => {
+    (r.price_history || []).forEach(h => allDates.add(h.date));
+  });
+  const sortedDates = [...allDates].sort();
+  retailers.slice(0,5).forEach((r, i) => {
+    const colors = ['#ffcd00','#00c853','#ff6d00','#e84393','#1565c0'];
+    const history = r.price_history || [];
+    const dataMap = Object.fromEntries(history.map(h => [h.date, h.price]));
+    const values = sortedDates.map(d => dataMap[d] || null);
+    if (values.some(v => v !== null)) {
+      datasets.push({
+        label: r.retailer,
+        data: values,
+        borderColor: colors[i % colors.length],
+        backgroundColor: colors[i % colors.length]+'20',
+        tension: 0.3,
+        fill: false,
+        pointRadius: 3,
+        spanGaps: true,
+      });
+    }
+  });
+  return { labels: sortedDates, datasets };
+}
+
+function drawHistoryChart(data) {
+  if (historyChartInstance) { historyChartInstance.destroy(); }
+  const canvas = document.getElementById('historyChart');
+  if (!canvas) return;
+  historyChartInstance = new Chart(canvas, {
+    type: 'line',
+    data,
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#aaa', font: { family: 'DM Sans', size: 11 }, boxWidth: 12 } } },
+      scales: {
+        x: { ticks: { color: '#666', font: { size: 10 } }, grid: { color: '#2a2a2a' } },
+        y: {
+          ticks: {
+            color: '#666', font: { size: 10 },
+            callback: v => `$${v}`
+          },
+          grid: { color: '#2a2a2a' }
+        }
+      }
+    }
+  });
+  // Force canvas height
+  canvas.parentElement.style.height = '160px';
+  historyChartInstance.resize();
+}
+
+function closeCompare() {
+  document.getElementById('compare-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+  if (historyChartInstance) { historyChartInstance.destroy(); historyChartInstance = null; }
+}
+
+function closeCompareOnBg(e) {
+  if (e.target === document.getElementById('compare-overlay')) closeCompare();
+}
+
+// ESC key
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCompare(); });
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+function populateRetailerDropdown(id, products) {
+  const sel = document.getElementById(id);
+  if (!sel) return;
+  const cur = sel.value;
+  const retailers = [...new Set(products.map(p => p.retailer))].sort();
+  sel.innerHTML = '<option value="">All Retailers</option>' +
+    retailers.map(r => `<option value="${r}"${r===cur?' selected':''}>${r}</option>`).join('');
+}
+
+async function triggerRefresh() {
+  if (API_URL === 'YOUR_RENDER_API_URL_HERE') return;
+  const btn = document.getElementById('refresh-btn');
+  btn.disabled = true; btn.textContent = 'Refreshing…';
+  try {
+    await fetch(`${API_URL}/api/refresh`, { method: 'POST' });
+    setTimeout(async () => { await Promise.all([loadPrices(), loadDrops()]); btn.disabled=false; btn.textContent='↻ Refresh'; }, 6000);
+  } catch { btn.disabled=false; btn.textContent='↻ Refresh'; }
+}
+
+async function testAlerts() {
+  if (API_URL === 'YOUR_RENDER_API_URL_HERE') { document.getElementById('test-result').textContent='⚠️ Set API_URL first'; return; }
+  document.getElementById('test-result').textContent = 'Sending…';
+  try { await fetch(`${API_URL}/api/alerts/test`, {method:'POST'}); document.getElementById('test-result').textContent='✅ Sent!'; }
+  catch { document.getElementById('test-result').textContent='❌ Failed'; }
+}
+
+function addWatched() {
+  const inp = document.getElementById('watched-input');
+  const val = inp.value.trim().replace(/\D/g,'');
+  if (!val) return;
+  if (!watchedSets.includes(val)) { watchedSets.push(val); localStorage.setItem('watchedSets', JSON.stringify(watchedSets)); }
+  inp.value=''; renderWatchedTags();
+}
+
+function removeWatched(set) {
+  watchedSets = watchedSets.filter(s => s !== set);
+  localStorage.setItem('watchedSets', JSON.stringify(watchedSets));
+  renderWatchedTags();
+}
+
+function renderWatchedTags() {
+  const el = document.getElementById('watched-tags');
+  if (!el) return;
+  el.innerHTML = watchedSets.map(s => `<div class="tag">#${s}<span class="tag-remove" onclick="removeWatched('${s}')">✕</span></div>`).join('')
+    || `<span style="font-size:.78rem;color:var(--muted)">No sets watched yet</span>`;
+}
+
+// ─── DEMO DATA ─────────────────────────────────────────────────────────────────
+function demoProducts() {
+  return [
+    {name:"LEGO Minecraft The Creeper Mine 21155",set_number:"21155",price:38.00,rrp:59.99,discount_pct:36.7,retailer:"Kmart",url:"#",in_stock:true},
+    {name:"LEGO City Police Station 60316",set_number:"60316",price:89.00,rrp:129.99,discount_pct:31.5,retailer:"Target",url:"#",in_stock:true},
+    {name:"LEGO Technic Bugatti Chiron 42151",set_number:"42151",price:249.00,rrp:349.99,discount_pct:28.9,retailer:"Big W",url:"#",in_stock:true},
+    {name:"LEGO Star Wars Millennium Falcon 75375",set_number:"75375",price:179.00,rrp:249.99,discount_pct:28.4,retailer:"Amazon AU",url:"#",in_stock:false},
+    {name:"LEGO Harry Potter Hogwarts Castle 76419",set_number:"76419",price:349.00,rrp:449.99,discount_pct:22.4,retailer:"Catch",url:"#",in_stock:true},
+    {name:"LEGO Speed Champions McLaren 76919",set_number:"76919",price:34.99,rrp:44.99,discount_pct:22.2,retailer:"EB Games",url:"#",in_stock:false},
+    {name:"LEGO Ninjago Dragon's Rising 71773",set_number:"71773",price:63.99,rrp:79.99,discount_pct:20.0,retailer:"Amazon AU",url:"#",in_stock:false},
+    {name:"LEGO Technic Land Rover Defender 42110",set_number:"42110",price:279.00,rrp:349.99,discount_pct:20.3,retailer:"Myer",url:"#",in_stock:true},
+    {name:"LEGO Icons Eiffel Tower 10307",set_number:"10307",price:599.00,rrp:699.99,discount_pct:14.4,retailer:"JB Hi-Fi",url:"#",in_stock:true},
+    {name:"LEGO Art World Map 31203",set_number:"31203",price:249.00,rrp:null,discount_pct:0,retailer:"Big W",url:"#",in_stock:true},
+    {name:"LEGO Friends Heartlake City 41711",set_number:"41711",price:119.99,rrp:null,discount_pct:0,retailer:"Target",url:"#",in_stock:true},
+    {name:"LEGO Creator 3-in-1 Exotic Parrot 31136",set_number:"31136",price:29.99,rrp:null,discount_pct:0,retailer:"Kmart",url:"#",in_stock:true},
+  ].sort((a,b)=>b.discount_pct-a.discount_pct);
+}
+
+function demoDrops() {
+  return [
+    {name:"LEGO Technic Bugatti Chiron 42151",set_number:"42151",price:249.00,rrp:349.99,discount_pct:28.9,retailer:"Big W",url:"#",in_stock:true,prev_price:299.00,drop_amount:50.00,drop_pct:16.7},
+    {name:"LEGO City Police Station 60316",set_number:"60316",price:89.00,rrp:129.99,discount_pct:31.5,retailer:"Target",url:"#",in_stock:true,prev_price:99.00,drop_amount:10.00,drop_pct:10.1},
+    {name:"LEGO Icons Eiffel Tower 10307",set_number:"10307",price:599.00,rrp:699.99,discount_pct:14.4,retailer:"JB Hi-Fi",url:"#",in_stock:true,prev_price:649.00,drop_amount:50.00,drop_pct:7.7},
+  ].sort((a,b)=>b.drop_pct-a.drop_pct);
+}
+
+function buildDemoCompare(meta) {
+  const retailers = ['Big W','Target','Kmart','Amazon AU','Catch','JB Hi-Fi','Myer'];
+  const basePrice = meta.price || 149;
+  const rrp = basePrice * 1.3;
+  return retailers.slice(0, 4 + Math.floor(Math.random()*3)).map((r, i) => ({
+    name: meta.n,
+    set_number: meta.s,
+    retailer: r,
+    price: parseFloat((basePrice * (0.95 + i*0.08)).toFixed(2)),
+    rrp: rrp,
+    discount_pct: parseFloat(((rrp - basePrice*(0.95+i*0.08))/rrp*100).toFixed(1)),
+    url: '#',
+    in_stock: i < 3,
+    price_history: [],
+  }));
+}
+
+init();
+</script>
+</body>
+</html>
