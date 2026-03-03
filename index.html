@@ -177,6 +177,7 @@
   .r-bigw{background:#0057a8;color:#fff} .r-target{background:#cc0000;color:#fff} .r-kmart{background:#d60812;color:#fff}
   .r-amazon{background:#ff9900;color:#111} .r-catch{background:#e84393;color:#fff} .r-jbhifi{background:#ffd100;color:#111}
   .r-myer{background:#1a1a3e;color:#fff} .r-ebgames{background:#003087;color:#fff}
+  .r-myhobbies{background:#e65c00;color:#fff} .r-toysrus{background:#e8173b;color:#fff}
 
   /* ─── COMPARE PAGE / MODAL ─── */
   #compare-overlay {
@@ -499,7 +500,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
 // ─── CONFIG ────────────────────────────────────────────────────────────────────
-const API_URL = 'https://lego-tracker-5g3m.onrender.com';
+const API_URL = 'YOUR_RENDER_API_URL_HERE';
 // Replace with your Render URL, e.g.: 'https://lego-au-tracker.onrender.com'
 
 // ─── STATE ─────────────────────────────────────────────────────────────────────
@@ -670,20 +671,29 @@ function renderDrops() {
 }
 
 // ─── IMAGE HELPERS ─────────────────────────────────────────────────────────────
-function setImageUrl(setNumber) {
+function rebrickableUrl(setNumber) {
   if (!setNumber) return null;
-  const clean = setNumber.replace(/-1$/, '');
-  return `https://cdn.rebrickable.com/media/sets/${clean}-1.jpg`;
+  const digits = (setNumber + '').replace(/[^0-9]/g, '');
+  if (digits.length < 4) return null;
+  return 'https://cdn.rebrickable.com/media/sets/' + digits + '-1.jpg';
 }
 
-function imgTag(setNumber, cls='card-img') {
-  const url = setImageUrl(setNumber);
-  if (!url) return `<div class="card-img-placeholder">🧱</div>`;
-  return `<img class="${cls}" src="${url}" alt="LEGO set image" loading="lazy" onerror="this.outerHTML='<div class=\\'card-img-placeholder\\'>🧱</div>'">`;
+// Primary: image_url from API data. Secondary: Rebrickable CDN. Fallback: brick emoji.
+function imgTag(setNumber, cls, imageUrl) {
+  cls = cls || 'card-img';
+  imageUrl = imageUrl || '';
+  var rebrick = rebrickableUrl(setNumber);
+  var primary = imageUrl || rebrick;
+  if (!primary) return '<div class="card-img-placeholder">🧱</div>';
+  var secondary = (imageUrl && rebrick && imageUrl !== rebrick) ? rebrick : null;
+  var onerror = secondary
+    ? "this.onerror=function(){this.outerHTML='<div class=\'card-img-placeholder\'>🧱</div>'};this.src='" + secondary + "'"
+    : "this.outerHTML='<div class=\'card-img-placeholder\'>🧱</div>'";
+  return '<img class="' + cls + '" src="' + primary + '" alt="LEGO" loading="lazy" onerror="' + onerror + '">';
 }
 
 // ─── CARD BUILDERS ─────────────────────────────────────────────────────────────
-const retailerClass = {'Big W':'r-bigw','Target':'r-target','Kmart':'r-kmart','Amazon AU':'r-amazon','Catch':'r-catch','JB Hi-Fi':'r-jbhifi','Myer':'r-myer','EB Games':'r-ebgames'};
+const retailerClass = {'Big W':'r-bigw','Target':'r-target','Kmart':'r-kmart','Amazon AU':'r-amazon','Catch':'r-catch','JB Hi-Fi':'r-jbhifi','Myer':'r-myer','EB Games':'r-ebgames','MyHobbies':'r-myhobbies','Toys R Us':'r-toysrus'};
 
 function badgeClass(pct) {
   if (pct >= 40) return 'badge-hot';
@@ -716,7 +726,7 @@ function dealCard(p, i) {
     <div class="card${!inStock ? ' out-of-stock' : ''}" style="animation-delay:${delay}s" onclick="openCompare('${enc(p)}')">
       ${ribbon}
       <div class="card-img-wrap" style="position:relative">
-        ${imgTag(p.set_number)}
+        ${imgTag(p.set_number, 'card-img', p.image_url)}
         <div class="stock-dot ${stockDotCls}" title="${stockPillText}"></div>
         ${stockBanner}
       </div>
@@ -749,7 +759,7 @@ function dropCard(d, i) {
     <div class="card${!inStock ? ' out-of-stock' : ''}" style="animation-delay:${delay}s" onclick="openCompare('${enc(d)}')">
       <div class="ribbon ribbon-drop">↓ DROPPED</div>
       <div class="card-img-wrap" style="position:relative">
-        ${imgTag(d.set_number)}
+        ${imgTag(d.set_number, 'card-img', d.image_url)}
         <div class="stock-dot ${stockDotCls}" title="${stockPillText}"></div>
         ${stockBanner}
       </div>
