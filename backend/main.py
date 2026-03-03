@@ -73,7 +73,7 @@ def scraper_api_url(target_url: str, render_js: bool = False) -> str:
         return target_url
     params = f"api_key={SCRAPER_API_KEY}&url={quote_plus(target_url)}&country_code=au"
     if render_js:
-        params += "&render=true"
+        params += "&render=true"  # JS rendering costs 5 credits vs 1 for plain HTML
     return f"https://api.scraperapi.com?{params}"
 
 def parse_price(text) -> float | None:
@@ -233,6 +233,63 @@ async def check_and_send_alerts(products: list[dict]):
 #  Their /collections/lego/products.json endpoint is always public — no proxy.
 # ══════════════════════════════════════════════════════════════════════════════
 
+
+async def scrape_shopify_proxied(client: httpx.AsyncClient,
+                                  base_url: str,
+                                  collection: str,
+                                  retailer_name: str) -> list[dict]:
+    """
+    Shopify scraper for stores that block direct access.
+    Routes through ScraperAPI using plain HTTP mode (no JS render needed for /products.json).
+    """
+    products = []
+    page = 1
+    while True:
+        url = f"{base_url}/collections/{collection}/products.json?limit=250&page={page}"
+        try:
+            proxied = scraper_api_url(url)  # plain HTTP, no JS render needed
+            r = await client.get(proxied, headers=HEADERS, timeout=60)
+            if r.status_code != 200:
+                logger.warning(f"{retailer_name} proxied page {page}: HTTP {r.status_code}")
+                break
+            try:
+                data = r.json()
+            except Exception:
+                # ScraperAPI might return HTML if something went wrong
+                logger.warning(f"{retailer_name} proxied page {page}: non-JSON response")
+                break
+            items = data.get("products", [])
+            if not items:
+                break
+            for item in items:
+                name = item.get("title", "")
+                if not name or "lego" not in name.lower():
+                    continue
+                variants = item.get("variants", [{}])
+                variant  = variants[0] if variants else {}
+                price    = parse_price(str(variant.get("price", "")))
+                rrp      = parse_price(str(variant.get("compare_at_price") or ""))
+                if not price:
+                    continue
+                images = item.get("images", [])
+                img    = images[0].get("src", "") if images else ""
+                handle = item.get("handle", "")
+                products.append(make_product(
+                    name, price, rrp, retailer_name,
+                    f"{base_url}/products/{handle}",
+                    str(variant.get("sku", item.get("id", ""))),
+                    img,
+                    variant.get("available", True)
+                ))
+            if len(items) < 250:
+                break
+            page += 1
+        except Exception as e:
+            logger.warning(f"{retailer_name} proxied page {page} error: {e}")
+            break
+    logger.info(f"{retailer_name}: {len(products)} products")
+    return products
+
 async def scrape_shopify(client: httpx.AsyncClient,
                          base_url: str,
                          collection: str,
@@ -296,7 +353,7 @@ async def scrape_bigw(client: httpx.AsyncClient) -> list[dict]:
     try:
         # Big W uses Next.js — __NEXT_DATA__ has all product data
         target = "https://www.bigw.com.au/search?q=lego&inStoreOnly=false&sz=96"
-        r = await client.get(scraper_api_url(target), headers=HEADERS, timeout=60)
+        r = await client.get(scraper_api_url(target, render_js=True), headers=HEADERS, timeout=90)
         data  = extract_next_data(r.text)
         pprops = data.get("props", {}).get("pageProps", {})
 
@@ -344,7 +401,7 @@ async def scrape_target(client: httpx.AsyncClient) -> list[dict]:
     products = []
     try:
         target = "https://www.target.com.au/search?SearchTerm=lego&sz=96"
-        r = await client.get(scraper_api_url(target), headers=HEADERS, timeout=60)
+        r = await client.get(scraper_api_url(target, render_js=True), headers=HEADERS, timeout=90)
         data   = extract_next_data(r.text)
         pprops = data.get("props", {}).get("pageProps", {})
 
@@ -389,7 +446,7 @@ async def scrape_kmart(client: httpx.AsyncClient) -> list[dict]:
     products = []
     try:
         target = "https://www.kmart.com.au/search/?q=lego&sz=96"
-        r = await client.get(scraper_api_url(target), headers=HEADERS, timeout=60)
+        r = await client.get(scraper_api_url(target, render_js=True), headers=HEADERS, timeout=90)
         data   = extract_next_data(r.text)
         pprops = data.get("props", {}).get("pageProps", {})
 
@@ -442,17 +499,31 @@ async def scrape_amazon_au(client: httpx.AsyncClient) -> list[dict]:
         logger.info(f"Amazon AU total cards: {len(all_cards)}")
 
         for card in all_cards:
-            title_el = card.select_one("h2 a span.a-text-normal, h2 a span, h2 span.a-text-normal")
+            # Try multiple selectors — Amazon changes their HTML structure frequently
+            title_el = (
+                card.select_one("h2 a span.a-text-normal")
+                or card.select_one("[data-cy='title-recipe'] span")
+                or card.select_one("h2 span")
+                or card.select_one(".a-size-base-plus.a-color-base.a-text-normal")
+                or card.select_one(".a-size-medium.a-color-base.a-text-normal")
+            )
             if not title_el: continue
             name = title_el.get_text(strip=True)
-            if len(name) < 8 or "lego" not in name.lower(): continue
+            # Skip very short names or non-LEGO results
+            if len(name) < 6 or "lego" not in name.lower(): continue
 
+            # Price: try structured price block first, then fallback
             pw = card.select_one(".a-price-whole")
             pf = card.select_one(".a-price-fraction")
-            if not pw: continue
-            price_str = pw.get_text(strip=True).replace(",", "").rstrip(".")
-            if pf: price_str += f".{pf.get_text(strip=True)}"
-            price = parse_price(price_str)
+            offscreen = card.select_one(".a-price .a-offscreen")
+            if offscreen:
+                price = parse_price(offscreen.get_text())
+            elif pw:
+                price_str = pw.get_text(strip=True).replace(",", "").rstrip(".")
+                if pf: price_str += f".{pf.get_text(strip=True)}"
+                price = parse_price(price_str)
+            else:
+                price = None
             if not price: continue
 
             was_el = card.select_one(".a-text-price .a-offscreen, .a-text-price span.a-offscreen")
@@ -477,7 +548,7 @@ async def scrape_catch(client: httpx.AsyncClient) -> list[dict]:
     products = []
     try:
         target = "https://www.catch.com.au/search/?q=lego&sort=popularity"
-        r = await client.get(scraper_api_url(target), headers=HEADERS, timeout=60)
+        r = await client.get(scraper_api_url(target, render_js=True), headers=HEADERS, timeout=90)
         data   = extract_next_data(r.text)
         pprops = data.get("props", {}).get("pageProps", {})
 
@@ -525,7 +596,7 @@ async def scrape_myer(client: httpx.AsyncClient) -> list[dict]:
     products = []
     try:
         target = "https://www.myer.com.au/search?query=lego&pageSize=48"
-        r = await client.get(scraper_api_url(target), headers=HEADERS, timeout=60)
+        r = await client.get(scraper_api_url(target, render_js=True), headers=HEADERS, timeout=90)
         data   = extract_next_data(r.text)
         pprops = data.get("props", {}).get("pageProps", {})
 
@@ -595,8 +666,8 @@ async def run_all_scrapers():
             scrape_catch(client),
             scrape_myer(client),
             # Shopify (native — no proxy needed)
-            scrape_shopify(client, "https://www.jbhifi.com.au",      "lego",       "JB Hi-Fi"),
-            scrape_shopify(client, "https://www.ebgames.com.au",     "lego",       "EB Games"),
+            scrape_shopify(client, "https://www.jbhifi.com.au",      "collectibles-merchandise/lego", "JB Hi-Fi"),
+            scrape_shopify_proxied(client, "https://www.ebgames.com.au", "lego", "EB Games"),
             scrape_shopify(client, "https://www.myhobbies.com.au",   "lego",       "MyHobbies"),
             scrape_shopify(client, "https://www.toysrus.com.au",     "lego",       "Toys R Us"),
             return_exceptions=True,
