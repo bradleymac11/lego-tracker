@@ -295,7 +295,7 @@ async def scrape_bigw(client: httpx.AsyncClient) -> list[dict]:
     products = []
     try:
         # Big W uses Next.js — __NEXT_DATA__ has all product data
-        target = "https://www.bigw.com.au/search?q=lego&inStoreOnly=false"
+        target = "https://www.bigw.com.au/search?q=lego&inStoreOnly=false&sz=96"
         r = await client.get(scraper_api_url(target), headers=HEADERS, timeout=60)
         data  = extract_next_data(r.text)
         pprops = data.get("props", {}).get("pageProps", {})
@@ -343,7 +343,7 @@ async def scrape_bigw(client: httpx.AsyncClient) -> list[dict]:
 async def scrape_target(client: httpx.AsyncClient) -> list[dict]:
     products = []
     try:
-        target = "https://www.target.com.au/search?SearchTerm=lego&sz=48"
+        target = "https://www.target.com.au/search?SearchTerm=lego&sz=96"
         r = await client.get(scraper_api_url(target), headers=HEADERS, timeout=60)
         data   = extract_next_data(r.text)
         pprops = data.get("props", {}).get("pageProps", {})
@@ -388,7 +388,7 @@ async def scrape_target(client: httpx.AsyncClient) -> list[dict]:
 async def scrape_kmart(client: httpx.AsyncClient) -> list[dict]:
     products = []
     try:
-        target = "https://www.kmart.com.au/search/?q=lego&sz=48"
+        target = "https://www.kmart.com.au/search/?q=lego&sz=96"
         r = await client.get(scraper_api_url(target), headers=HEADERS, timeout=60)
         data   = extract_next_data(r.text)
         pprops = data.get("props", {}).get("pageProps", {})
@@ -430,13 +430,18 @@ async def scrape_kmart(client: httpx.AsyncClient) -> list[dict]:
 async def scrape_amazon_au(client: httpx.AsyncClient) -> list[dict]:
     products = []
     try:
-        target = "https://www.amazon.com.au/s?k=lego+set&i=toys&rh=n%3A4975211011&s=review-rank"
-        r = await client.get(scraper_api_url(target), headers=HEADERS, timeout=60)
-        soup  = BeautifulSoup(r.text, "html.parser")
-        cards = soup.select("[data-component-type='s-search-result']")
-        logger.info(f"Amazon AU cards: {len(cards)}")
+        target = "https://www.amazon.com.au/s?k=lego&i=toys&s=review-rank"
+        all_cards = []
+        for pg in range(1, 4):  # scrape pages 1-3 for broader coverage
+            page_url = target + f"&page={pg}"
+            r = await client.get(scraper_api_url(page_url), headers=HEADERS, timeout=60)
+            soup = BeautifulSoup(r.text, "html.parser")
+            cards = soup.select("[data-component-type='s-search-result']")
+            all_cards.extend(cards)
+            if len(cards) < 10: break
+        logger.info(f"Amazon AU total cards: {len(all_cards)}")
 
-        for card in cards[:40]:
+        for card in all_cards:
             title_el = card.select_one("h2 a span.a-text-normal, h2 a span, h2 span.a-text-normal")
             if not title_el: continue
             name = title_el.get_text(strip=True)
